@@ -98,7 +98,7 @@ def load_demos(*demos_files):
     # TODO - tag the demos
     all_demos = []
     for df in demos_files:
-        with open(args.demos, "rb") as f:
+        with open(df, "rb") as f:
             demos = pickle.load(f)
             # Just load 1k
             demos = demos[:10000]
@@ -171,8 +171,9 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--demos",
-        default="./demos/BabyAI-GoTo-v0.pkl",
-        help="Path to demos pickle file",
+        default=["./demos/BabyAI-GoTo-v0.pkl", ],
+        nargs='+',
+        help="Demos pickle files",
     )
     parser.add_argument(
         "--exp_dir",
@@ -186,7 +187,7 @@ if __name__ == "__main__":
     os.makedirs(args.exp_dir, exist_ok=True)
     util.save_args(args, args.exp_dir)
 
-    demos = load_demos(args.demos)
+    demos = load_demos(*args.demos)
     val_size = int(len(demos) * 0.1)
     test_size = int(len(demos) * 0.1)
     dsets = torch.utils.data.random_split(

@@ -9,7 +9,7 @@ from teacher import Teacher
 import numpy as np
 import torch
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
-from tqdm import tqdm, trange
+from tqdm import tqdm
 from torch import nn, optim
 import util
 from contextlib import nullcontext
@@ -94,14 +94,13 @@ class Demos:
         return len(self.langs)
 
 
-def load_demos(*demos_files):
+def load_demos(*demos_files, n_per_file=100000):
     # TODO - tag the demos
     all_demos = []
     for df in demos_files:
         with open(df, "rb") as f:
             demos = pickle.load(f)
-            # Just load 1k
-            demos = demos[:10000]
+            demos = demos[:n_per_file]
             all_demos.extend(demos)
 
     demos_dset = Demos(all_demos)
@@ -176,10 +175,15 @@ if __name__ == "__main__":
         help="Demos pickle files",
     )
     parser.add_argument(
+        "--n_per_file", default=100000, type=int,
+        help="How many demos to load per pickle file",
+    )
+    parser.add_argument(
         "--exp_dir",
         default="exp/debug",
         help="Path to exp dir",
     )
+    parser.add_argument("--epochs", default=10, type=int)
     parser.add_argument("--cuda", action="store_true")
 
     args = parser.parse_args()
@@ -187,7 +191,7 @@ if __name__ == "__main__":
     os.makedirs(args.exp_dir, exist_ok=True)
     util.save_args(args, args.exp_dir)
 
-    demos = load_demos(*args.demos)
+    demos = load_demos(*args.demos, n_per_file=args.n_per_file)
     val_size = int(len(demos) * 0.1)
     test_size = int(len(demos) * 0.1)
     dsets = torch.utils.data.random_split(
@@ -196,7 +200,7 @@ if __name__ == "__main__":
 
     def to_dl(d):
         return torch.utils.data.DataLoader(
-            d, batch_size=4, pin_memory=True, num_workers=4, collate_fn=demo_collate
+            d, batch_size=100, pin_memory=True, num_workers=4, collate_fn=demo_collate
         )
 
     dataloaders = {
@@ -219,14 +223,14 @@ if __name__ == "__main__":
     top1 = util.AverageMeter()
 
     records = []
-    for epoch in trange(10, desc="Epoch"):
+    for epoch in range(args.epochs):
         train_metrics = run(
             "train", epoch, model, criterion, optimizer, dataloaders["train"]
         )
-        print(f"TRAIN {epoch} loss {train_metrics['loss']:.3f} top1 {train_metrics['top1']:.3f} top5 {train_metrics['top5']:.3f}")
+        tqdm.write(f"TRAIN {epoch} loss {train_metrics['loss']:.3f} top1 {train_metrics['top1']:.3f} top5 {train_metrics['top5']:.3f}")
 
         val_metrics = run("val", epoch, model, criterion, optimizer, dataloaders["val"])
-        print(f"VAL {epoch} loss {val_metrics['loss']:.3f} top1 {val_metrics['top1']:.3f} top5 {val_metrics['top5']:.3f}")
+        tqdm.write(f"VAL {epoch} loss {val_metrics['loss']:.3f} top1 {val_metrics['top1']:.3f} top5 {val_metrics['top5']:.3f}")
 
         records.append({
             **{

@@ -4,3 +4,4 @@
 demos/
 exp/*
 !exp/README.md
+sync_results.sh

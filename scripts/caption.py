@@ -238,4 +238,4 @@ if __name__ == "__main__":
             'epoch': epoch,
         })
 
-        pd.DataFrame(records).to_csv(os.path.join(args.exp_dir, 'metrics.csv'))
+        pd.DataFrame(records).to_csv(os.path.join(args.exp_dir, 'metrics.csv'), index=False)

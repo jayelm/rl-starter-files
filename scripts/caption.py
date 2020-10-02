@@ -230,7 +230,7 @@ if __name__ == "__main__":
         records.append({
             **{
                 f'train_{k}': v for k, v in train_metrics.items()
-            }
+            },
             **{
                 f'val_{k}': v for k, v in train_metrics.items()
             },

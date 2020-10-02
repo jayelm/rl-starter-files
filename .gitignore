@@ -9,3 +9,5 @@ sync_results.sh
 .Rproj.user
 .RData
 .Rhistory
+
+*.nb.html

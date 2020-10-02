@@ -1,3 +1,46 @@
+"""
+utils
+"""
+
+
+import os
+import subprocess
+import json
+import logs
+
+
+logger = logs.get_logger(__name__)
+
+
+def current_git_hash():
+    """
+    Get the hash of the latest commit in this repository. Does not account for unstaged changes.
+    Returns
+    -------
+    git_hash : ``str``, optional
+        The string corresponding to the current git hash if known, else ``None`` if something failed.
+    """
+    unstaged_changes = False
+    try:
+        subprocess.check_output(["git", "diff-index", "--quiet", "HEAD", "--"])
+    except subprocess.CalledProcessError as grepexc:
+        if grepexc.returncode == 1:
+            logger.warn("Running experiments with unstaged changes.")
+            unstaged_changes = True
+    except FileNotFoundError:
+        logger.warn("Git not found")
+    try:
+        git_hash = (
+            subprocess.check_output(["git", "describe", "--always"])
+            .strip()
+            .decode("utf-8")
+        )
+        return git_hash, unstaged_changes
+    except subprocess.CalledProcessError:
+        return None, None
+
+
+
 class AverageMeter:
     """
     Keeps track of most recent, average, sum, and count of a metric.
@@ -84,3 +127,25 @@ def compute_average_metrics(meters):
         for m, v in metrics.items()
     }
     return metrics
+
+
+def save_args(args, exp_dir, filename="args.json"):
+    """
+    Save arguments in the experiment directory. This is REALLY IMPORTANT for
+    reproducibility, so you know exactly what configuration of arguments
+    resulted in what experiment result! As a bonus, this function also saves
+    the current git hash so you know exactly which version of the code produced
+    your result (that is, as long as you don't run with unstaged changes).
+    Parameters
+    ----------
+    args : ``argparse.Namespace``
+        Arguments to save
+    exp_dir : ``str``
+        Folder to save args to
+    filename : ``str``, optional (default: 'args.json')
+        Name of argument file
+    """
+    args_dict = vars(args)
+    args_dict["git_hash"], args_dict["git_unstaged_changes"] = current_git_hash()
+    with open(os.path.join(exp_dir, filename), "w") as f:
+        json.dump(args_dict, f, indent=4, separators=(",", ": "), sort_keys=True)

@@ -13,6 +13,8 @@ from tqdm import tqdm, trange
 from torch import nn, optim
 import util
 from contextlib import nullcontext
+import pandas as pd
+import os
 
 
 def demo_collate(batch):
@@ -172,9 +174,17 @@ if __name__ == "__main__":
         default="./demos/BabyAI-GoTo-v0.pkl",
         help="Path to demos pickle file",
     )
+    parser.add_argument(
+        "--exp_dir",
+        default="exp/debug",
+        help="Path to exp dir",
+    )
     parser.add_argument("--cuda", action="store_true")
 
     args = parser.parse_args()
+
+    os.makedirs(args.exp_dir, exist_ok=True)
+    util.save_args(args, args.exp_dir)
 
     demos = load_demos(args.demos)
     val_size = int(len(demos) * 0.1)
@@ -207,9 +217,24 @@ if __name__ == "__main__":
     top5 = util.AverageMeter()
     top1 = util.AverageMeter()
 
+    records = []
     for epoch in trange(10, desc="Epoch"):
         train_metrics = run(
             "train", epoch, model, criterion, optimizer, dataloaders["train"]
         )
+        print(f"TRAIN {epoch} loss {train_metrics['loss']:.3f} top1 {train_metrics['top1']:.3f} top5 {train_metrics['top5']:.3f}")
+
         val_metrics = run("val", epoch, model, criterion, optimizer, dataloaders["val"])
-        print(train_metrics)
+        print(f"VAL {epoch} loss {val_metrics['loss']:.3f} top1 {val_metrics['top1']:.3f} top5 {val_metrics['top5']:.3f}")
+
+        records.append({
+            **{
+                f'train_{k}': v for k, v in train_metrics.items()
+            }
+            **{
+                f'val_{k}': v for k, v in train_metrics.items()
+            },
+            'epoch': epoch,
+        })
+
+        pd.DataFrame(records).to_csv(os.path.join(args.exp_dir, 'metrics.csv'))

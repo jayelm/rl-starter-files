@@ -5,3 +5,7 @@ demos/
 exp/*
 !exp/README.md
 sync_results.sh
+
+.Rproj.user
+.RData
+.Rhistory

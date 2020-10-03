@@ -1,0 +1,35 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r setup}
+library(tidyverse)
+library(cowplot)
+theme_set(theme_cowplot())
+```
+
+```{r}
+EXPTS <- c(
+  'boss', 'goto', 'pickup', 'synth'
+)
+metrics <- sapply(EXPTS, function(name) {
+  read_csv(sprintf('../exp/%s/metrics.csv', name)) %>%
+    mutate(
+      dataset = name,
+      epoch = epoch + 1
+    )
+}, simplify = F) %>%
+  bind_rows
+
+metrics <- metrics %>%
+  gather('split', 'top1', val_top1, train_top1) %>%
+  mutate(split = ifelse(split == 'val_top1', 'val', 'train'))
+  
+ggplot(metrics, aes(x = epoch, y = top1, color = dataset)) +
+  geom_line() +
+  facet_wrap(~ split) +
+  scale_x_continuous(breaks = 1:10)
+```
+

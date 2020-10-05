@@ -40,7 +40,6 @@ def current_git_hash():
         return None, None
 
 
-
 class AverageMeter:
     """
     Keeps track of most recent, average, sum, and count of a metric.

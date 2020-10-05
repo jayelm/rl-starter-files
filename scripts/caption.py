@@ -203,18 +203,18 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--demos",
-        default=["./demos/BabyAI-GoTo-v0.pkl", ],
-        nargs='+',
+        default=["./demos/BabyAI-GoTo-v0.pkl",],
+        nargs="+",
         help="Demos pickle files",
     )
     parser.add_argument(
-        "--n_per_file", default=100000, type=int,
+        "--n_per_file",
+        default=100000,
+        type=int,
         help="How many demos to load per pickle file",
     )
     parser.add_argument(
-        "--exp_dir",
-        default="exp/debug",
-        help="Path to exp dir",
+        "--exp_dir", default="exp/debug", help="Path to exp dir",
     )
     parser.add_argument("--epochs", default=20, type=int)
     parser.add_argument("--cuda", action="store_true")
@@ -260,19 +260,23 @@ if __name__ == "__main__":
         train_metrics = run(
             "train", epoch, model, criterion, optimizer, dataloaders["train"]
         )
-        tqdm.write(f"TRAIN {epoch} loss {train_metrics['loss']:.3f} top1 {train_metrics['top1']:.3f} top5 {train_metrics['top5']:.3f}")
+        tqdm.write(
+            f"TRAIN {epoch} loss {train_metrics['loss']:.3f} top1 {train_metrics['top1']:.3f} top5 {train_metrics['top5']:.3f}"
+        )
 
         val_metrics = run("val", epoch, model, criterion, optimizer, dataloaders["val"])
-        tqdm.write(f"VAL {epoch} loss {val_metrics['loss']:.3f} top1 {val_metrics['top1']:.3f} top5 {val_metrics['top5']:.3f} bleu4 {val_metrics['bleu4']:.3f}")
+        tqdm.write(
+            f"VAL {epoch} loss {val_metrics['loss']:.3f} top1 {val_metrics['top1']:.3f} top5 {val_metrics['top5']:.3f} bleu4 {val_metrics['bleu4']:.3f}"
+        )
 
-        records.append({
-            **{
-                f'train_{k}': v for k, v in train_metrics.items()
-            },
-            **{
-                f'val_{k}': v for k, v in train_metrics.items()
-            },
-            'epoch': epoch,
-        })
+        records.append(
+            {
+                **{f"train_{k}": v for k, v in train_metrics.items()},
+                **{f"val_{k}": v for k, v in train_metrics.items()},
+                "epoch": epoch,
+            }
+        )
 
-        pd.DataFrame(records).to_csv(os.path.join(args.exp_dir, 'metrics.csv'), index=False)
+        pd.DataFrame(records).to_csv(
+            os.path.join(args.exp_dir, "metrics.csv"), index=False
+        )

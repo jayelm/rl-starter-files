@@ -13,7 +13,9 @@ import numpy as np
 
 
 class DemonstrationEncoder(nn.Module):
-    def __init__(self, n_dirs, n_acts, obs_dim=(7, 7), dir_dim=50, act_dim=100, hidden_dim=512):
+    def __init__(
+        self, n_dirs, n_acts, obs_dim=(7, 7), dir_dim=50, act_dim=100, hidden_dim=512
+    ):
         super().__init__()
 
         self.obs_encoder = nn.Sequential(
@@ -55,7 +57,9 @@ class DemonstrationEncoder(nn.Module):
 
         inp_enc = torch.cat((obs_enc, dirs_enc, acts_enc), 2)
 
-        packed = pack_padded_sequence(inp_enc, obs_lens, enforce_sorted=False, batch_first=True)
+        packed = pack_padded_sequence(
+            inp_enc, obs_lens, enforce_sorted=False, batch_first=True
+        )
 
         _, hidden = self.gru(packed, hidden)
         return hidden[-1]
@@ -81,7 +85,9 @@ class LanguageDecoder(nn.Module):
 
         # No need to decode at the end position, so decrement tgt_len
         tgt_len = tgt_len - 1
-        packed_input = pack_padded_sequence(embed_tgt, tgt_len, enforce_sorted=False, batch_first=True)
+        packed_input = pack_padded_sequence(
+            embed_tgt, tgt_len, enforce_sorted=False, batch_first=True
+        )
 
         # shape = (tgt_len, batch, hidden_dim)
         packed_output, _ = self.gru(packed_input, enc_out)

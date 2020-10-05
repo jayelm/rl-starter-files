@@ -55,8 +55,8 @@ def get_txt_logger(model_dir):
         format="%(message)s",
         handlers=[
             logging.FileHandler(filename=path),
-            logging.StreamHandler(sys.stdout)
-        ]
+            logging.StreamHandler(sys.stdout),
+        ],
     )
 
     return logging.getLogger()

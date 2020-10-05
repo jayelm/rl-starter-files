@@ -216,7 +216,7 @@ if __name__ == "__main__":
         default="exp/debug",
         help="Path to exp dir",
     )
-    parser.add_argument("--epochs", default=10, type=int)
+    parser.add_argument("--epochs", default=20, type=int)
     parser.add_argument("--cuda", action="store_true")
 
     args = parser.parse_args()

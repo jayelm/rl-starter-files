@@ -15,6 +15,27 @@ import util
 from contextlib import nullcontext
 import pandas as pd
 import os
+import bleu
+
+
+def to_text(tokens, vocab):
+    if isinstance(tokens, torch.Tensor):
+        # Single example, tensor
+        if tokens.ndim == 1:
+            tokens = [tokens]
+
+    texts = []
+    for caption in tokens:
+        this_text = []
+        for tok in caption:
+            t = vocab[tok.item()]
+            if t == "<SOS>":
+                continue
+            if t in {"<EOS>", "<PAD>"}:
+                break
+            this_text.append(t)
+        texts.append(" ".join(this_text))
+    return texts
 
 
 def demo_collate(batch):
@@ -113,15 +134,18 @@ def run(split, epoch, model, criterion, optimizer, dataloader):
     if training:
         ctx = nullcontext
         model.train()
+        to_measure = ["top1", "top5", "loss"]
     else:
         ctx = torch.no_grad
         model.eval()
+        to_measure = ["top1", "top5", "loss", "bleu4"]
 
-    meters = {m: util.AverageMeter() for m in ["top1", "top5", "loss"]}
+    meters = {m: util.AverageMeter() for m in to_measure}
 
     ranger = tqdm(dataloader, desc=str(epoch))
     for batch_i, batch in enumerate(ranger):
         obs, dirs, acts, obs_lens, langs, lang_lens = batch
+        batch_size = obs.shape[0]
         obs = obs.float()
 
         if args.cuda:
@@ -149,6 +173,15 @@ def run(split, epoch, model, criterion, optimizer, dataloader):
             optimizer.zero_grad()
             this_loss.backward()
             optimizer.step()
+        else:
+            # Sample
+            sampled_lang, sampled_lengths = model.sample(obs, dirs, acts, obs_lens)
+            sampled_text = to_text(sampled_lang, model.rev_vocab)
+            true_text = to_text(langs, model.rev_vocab)
+            true_text = [[t] for t in true_text]
+
+            b4 = bleu.compute_bleu(true_text, sampled_text)[0] * 100
+            meters["bleu4"].update(b4, batch_size)
 
         top5 = util.accuracy(logits, targets, 5)
         meters["top5"].update(top5, n_targets)
@@ -212,7 +245,7 @@ if __name__ == "__main__":
     # Hardcode obs space for nwo
     # ==== MODEL ====
     #  obs_space = {'image': (7, 7)}
-    model = Teacher(len(demos.dirs_w2i), len(demos.acts_w2i), len(demos.lang_w2i))
+    model = Teacher(len(demos.dirs_w2i), len(demos.acts_w2i), demos.lang_w2i)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters())
     if args.cuda:
@@ -230,7 +263,7 @@ if __name__ == "__main__":
         tqdm.write(f"TRAIN {epoch} loss {train_metrics['loss']:.3f} top1 {train_metrics['top1']:.3f} top5 {train_metrics['top5']:.3f}")
 
         val_metrics = run("val", epoch, model, criterion, optimizer, dataloaders["val"])
-        tqdm.write(f"VAL {epoch} loss {val_metrics['loss']:.3f} top1 {val_metrics['top1']:.3f} top5 {val_metrics['top5']:.3f}")
+        tqdm.write(f"VAL {epoch} loss {val_metrics['loss']:.3f} top1 {val_metrics['top1']:.3f} top5 {val_metrics['top5']:.3f} bleu4 {val_metrics['bleu4']:.3f}")
 
         records.append({
             **{

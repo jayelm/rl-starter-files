@@ -62,11 +62,12 @@ class DemonstrationEncoder(nn.Module):
 
 
 class LanguageDecoder(nn.Module):
-    def __init__(self, vocab_size, embedding_dim=300, hidden_dim=512):
+    def __init__(self, vocab, embedding_dim=300, hidden_dim=512):
         super().__init__()
-        self.vocab_size = vocab_size
+        self.vocab_size = len(vocab)
+        self.vocab = vocab
         self.embedding_dim = embedding_dim
-        self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=0)
+        self.embedding = nn.Embedding(self.vocab_size, embedding_dim, padding_idx=0)
         self.hidden_dim = hidden_dim
         self.gru = nn.GRU(self.embedding_dim, self.hidden_dim, batch_first=True)
         self.dense = nn.Linear(self.hidden_dim, self.vocab_size)
@@ -88,34 +89,28 @@ class LanguageDecoder(nn.Module):
 
         return logits
 
-    def sample(self, feats, sos_index, eos_index, pad_index, greedy=False):
+    def sample(self, enc_out, max_len=50, greedy=False):
         """Generate from image features using greedy search."""
         with torch.no_grad():
-            batch_size = feats.size(0)
+            # TODO 20201002 - need to pass vocab size etc.
+            batch_size = enc_out.size(0)
 
-            # initialize hidden states using image features
-            states = feats.unsqueeze(0)
+            states = enc_out.unsqueeze(0)
 
             # first input is SOS token
-            inputs = np.array([sos_index for _ in range(batch_size)])
-            inputs = torch.from_numpy(inputs)
-            inputs = inputs.unsqueeze(1)
-            inputs = inputs.to(feats.device)
+            inputs = torch.full((batch_size, 1), self.vocab["<SOS>"], dtype=torch.int64)
+            inputs = inputs.to(enc_out.device)
 
             # save SOS as first generated token
-            inputs_npy = inputs.squeeze(1).cpu().numpy()
-            sampled_ids = [[w] for w in inputs_npy]
-
-            # (B,L,D) to (L,B,D)
-            inputs = inputs.transpose(0, 1)
+            sampled_ids = [[self.vocab["<SOS>"]] for _ in range(batch_size)]
 
             # compute embeddings
             inputs = self.embedding(inputs)
 
-            for i in range(20):  # like in jacobs repo
-                outputs, states = self.gru(inputs, states)  # outputs: (L=1,B,H)
-                outputs = outputs.squeeze(0)  # outputs: (B,H)
-                outputs = self.outputs2vocab(outputs)  # outputs: (B,V)
+            for i in range(max_len):
+                outputs, states = self.gru(inputs, states)
+                outputs = outputs.squeeze(1)
+                outputs = self.dense(outputs)
 
                 if greedy:
                     predicted = outputs.max(1)[1]
@@ -128,17 +123,16 @@ class LanguageDecoder(nn.Module):
                 predicted_lst = predicted_npy.tolist()
 
                 for w, so_far in zip(predicted_lst, sampled_ids):
-                    if so_far[-1] != eos_index:
+                    if so_far[-1] != self.vocab["<EOS>"]:
                         so_far.append(w)
 
-                inputs = predicted.transpose(0, 1)  # inputs: (L=1,B)
-                inputs = self.embedding(inputs)  # inputs: (L=1,B,E)
+                inputs = self.embedding(predicted)
 
             sampled_lengths = [len(text) for text in sampled_ids]
             sampled_lengths = np.array(sampled_lengths)
 
             max_length = max(sampled_lengths)
-            padded_ids = np.ones((batch_size, max_length)) * pad_index
+            padded_ids = np.full((batch_size, max_length), self.vocab["<PAD>"])
 
             for i in range(batch_size):
                 padded_ids[i, : sampled_lengths[i]] = sampled_ids[i]
@@ -150,13 +144,20 @@ class LanguageDecoder(nn.Module):
 
 
 class Teacher(nn.Module):
-    def __init__(self, n_dirs, n_acts, n_lang):
+    def __init__(self, n_dirs, n_acts, vocab):
         super().__init__()
         self.encoder = DemonstrationEncoder(n_dirs, n_acts)
-        self.decoder = LanguageDecoder(n_lang)
+        self.vocab = vocab
+        self.rev_vocab = {v: k for k, v in self.vocab.items()}
+        self.decoder = LanguageDecoder(vocab)
 
     def forward(self, obs, dirs, acts, obs_lens, langs, lang_lens, hidden=None):
         demos_enc = self.encoder(obs, dirs, acts, obs_lens)
 
         langs_pred = self.decoder(demos_enc, langs, lang_lens)
+        return langs_pred
+
+    def sample(self, obs, dirs, acts, obs_lens, **kwargs):
+        demos_enc = self.encoder(obs, dirs, acts, obs_lens)
+        langs_pred = self.decoder.sample(demos_enc, **kwargs)
         return langs_pred
